@@ -1,8 +1,17 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from valuation import calcular_valuation
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class DadosValuation(BaseModel):
@@ -15,6 +24,11 @@ class DadosValuation(BaseModel):
     divida: float
     caixa: float
     quantidade_acoes: int
+
+
+@app.get("/")
+def home():
+    return {"mensagem": "API de valuation online"}
 
 
 @app.post("/calcular-valuation")
