@@ -1,0 +1,8 @@
+{
+  "name": "FinSight",
+  "description": "Plataforma profissional de análise de valuation financeiro baseada no método DCF (Discounted Cash Flow).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
