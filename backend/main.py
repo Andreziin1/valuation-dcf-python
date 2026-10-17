@@ -1,180 +1,94 @@
-from bolsa import buscar_dados_bolsa
-from valuation import calcular_valuation
-from relatorio import gerar_relatorio_txt
-from utils import (
-    formatar_moeda,
-    formatar_porcentagem,
-    validar_maior_que_zero,
-    validar_nao_negativo,
-    validar_taxas,
-    calcular_margem_seguranca,
-    gerar_diagnostico,
-    calcular_potencial_valorizacao,
-    gerar_cenarios,
-    titulo,
-    subtitulo
-)
+"""Terminal NexoDCF: compartilha validação e resultado com a API."""
+import math
+import re
+
+if __package__:
+    from .api import DadosValuation, calcular, mercado_habilitado
+    from .bolsa import buscar_dados_bolsa
+    from .relatorio import gerar_relatorio_txt
+    from .utils import formatar_moeda, formatar_porcentagem, gerar_diagnostico
+else:
+    from api import DadosValuation, calcular, mercado_habilitado
+    from bolsa import buscar_dados_bolsa
+    from relatorio import gerar_relatorio_txt
+    from utils import formatar_moeda, formatar_porcentagem, gerar_diagnostico
 
 
-titulo("CALCULADORA DE VALUATION DCF")
+def ler_numero(texto, opcional=False):
+    value = input(texto).strip().replace(" ", "")
+    if not value and opcional:
+        return None
+    if not re.fullmatch(r"-?\d+(?:[.,]\d+)*", value):
+        raise ValueError("Use números, com vírgula para decimais.")
+    if "," in value:
+        if not re.fullmatch(r"-?(?:\d+|\d{1,3}(?:\.\d{3})+),\d+", value):
+            raise ValueError("Número inválido.")
+        value = value.replace(".", "").replace(",", ".")
+    elif re.fullmatch(r"-?\d{1,3}(?:\.\d{3})+", value):
+        value = value.replace(".", "")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("Número fora do limite.")
+    return number
 
-print("1 - Empresa listada na bolsa")
-print("2 - Empresa não listada / análise manual")
 
-opcao = input("\nEscolha uma opção: ")
+def main():
+    print("NexoDCF — Valuation por fluxo de caixa descontado")
+    print("Estimativa educacional condicionada às premissas, não recomendação.")
+    print("1 — Empresa listada\n2 — Empresa não listada")
+    try:
+        option = input("Escolha: ").strip()
+        company = None
+        if option == "1":
+            if not mercado_habilitado():
+                raise ValueError("Consulta automática desabilitada nesta instalação.")
+            company = buscar_dados_bolsa(input("Ticker: "))
+            data = {key: company[key] for key in ("nome_empresa", "fcf_inicial", "divida", "caixa", "quantidade_acoes", "preco_atual")}
+            print("Dados importados:", data)
+            for warning in company["avisos"]:
+                print("Atenção:", warning)
+            if input("Ajustar dados importados? [s/N]: ").strip().lower() == "s":
+                for key in ("fcf_inicial", "divida", "caixa", "quantidade_acoes", "preco_atual"):
+                    value = ler_numero(f"{key} (Enter mantém o importado): ", opcional=True)
+                    if value is not None:
+                        data[key] = value
+        elif option == "2":
+            data = {"nome_empresa": input("Nome da empresa: ")}
+        else:
+            raise ValueError("Escolha 1 ou 2.")
+        for key, label in (
+            ("fcf_inicial", "Fluxo anual compatível com FCFF (R$): "),
+            ("divida", "Dívida total (R$): "), ("caixa", "Caixa disponível (R$): "),
+            ("quantidade_acoes", "Total de ações/cotas da empresa: "),
+            ("preco_atual", "Preço de referência (opcional, Enter sem comparação): "),
+        ):
+            if data.get(key) is None:
+                data[key] = ler_numero(label, opcional=key == "preco_atual")
+        data["crescimento"] = ler_numero("Crescimento anual (%): ") / 100
+        data["taxa_desconto"] = ler_numero("Taxa de desconto compatível / WACC (%): ") / 100
+        data["anos_projecao"] = ler_numero("Anos de projeção: ")
+        data["crescimento_perpetuo"] = ler_numero("Crescimento perpétuo (%): ") / 100
+        print("O FCF do fornecedor não é automaticamente FCFF. Confira a base do fluxo.")
+        data["modelo_confirmado"] = input("Revisou fluxo FCFF e premissas? [s/N]: ").strip().lower() == "s"
+        result = calcular(DadosValuation(**data))
+        value = formatar_moeda(result["valor_justo_acao"]) if result["estimativa_positiva"] else "Sem estimativa positiva"
+        print("\nValor estimado por ação/cota:", value)
+        print("Preço de referência:", formatar_moeda(result["preco_atual"]))
+        potential = result["potencial_valorizacao"]
+        print("Diferença para o preço:", "—" if potential is None else formatar_porcentagem(potential / 100))
+        print("Margem de segurança:", formatar_porcentagem(result["margem_seguranca"]))
+        print("Não é previsão de cotação nem retorno garantido.")
+        legacy_result = {**result, "valor_empresa": result["valuation_total"], "fluxos": result["fluxos_projetados"]}
+        scenarios = [{"valor_justo_acao": result["cenarios"][key]} for key in ("pessimista", "base", "otimista")]
+        path = gerar_relatorio_txt(data["nome_empresa"], data["taxa_desconto"], legacy_result,
+                                  data["preco_atual"], potential, result["margem_seguranca"],
+                                  gerar_diagnostico(result["margem_seguranca"]), *scenarios)
+        print("Relatório gerado:", path)
+    except (ValueError, LookupError) as error:
+        print("Revise os dados:", error)
+    except Exception:
+        print("Não foi possível concluir. Verifique a conexão, o fornecedor e a permissão de gravar o relatório.")
 
-try:
-    if opcao == "1":
-        ticker = input("Ticker da empresa: ").upper()
-        dados_bolsa = buscar_dados_bolsa(ticker)
 
-        nome_empresa = dados_bolsa["ticker"]
-        preco_atual = dados_bolsa["preco_atual"]
-        divida = dados_bolsa["divida"]
-        caixa = dados_bolsa["caixa"]
-        quantidade_acoes = dados_bolsa["quantidade_acoes"]
-
-        print(f"\nEmpresa selecionada: {nome_empresa}")
-        print(f"Preço atual encontrado: {formatar_moeda(preco_atual)}")
-        print(f"Dívida encontrada: {formatar_moeda(divida)}")
-        print(f"Caixa encontrado: {formatar_moeda(caixa)}")
-        print(f"Quantidade de ações: {quantidade_acoes}")
-
-    elif opcao == "2":
-        nome_empresa = input("Nome da empresa: ")
-
-    else:
-        raise ValueError("Opção inválida. Escolha 1 ou 2.")
-
-    fcf_inicial = float(input("\nFluxo de caixa livre atual: R$ "))
-    crescimento = float(input("Crescimento esperado ao ano (%): ")) / 100
-
-    selic = float(input("Taxa Selic atual (%): ")) / 100
-    premio_risco = float(input("Prêmio de risco (%): ")) / 100
-    taxa_desconto = selic + premio_risco
-
-    anos_projecao = int(input("Quantidade de anos para projeção: "))
-    crescimento_perpetuo = float(input("Crescimento perpétuo (%): ")) / 100
-
-    if opcao == "2":
-        divida = float(input("Dívida total da empresa: R$ "))
-        caixa = float(input("Caixa disponível da empresa: R$ "))
-        quantidade_acoes = int(input("Quantidade de ações da empresa: "))
-        preco_atual = float(input("Preço atual da ação: R$ "))
-
-    validar_maior_que_zero(fcf_inicial, "Fluxo de caixa livre")
-    validar_nao_negativo(crescimento, "Crescimento esperado")
-    validar_nao_negativo(selic, "Taxa Selic")
-    validar_nao_negativo(premio_risco, "Prêmio de risco")
-    validar_maior_que_zero(anos_projecao, "Anos de projeção")
-    validar_taxas(taxa_desconto, crescimento_perpetuo)
-    validar_nao_negativo(divida, "Dívida")
-    validar_nao_negativo(caixa, "Caixa")
-    validar_maior_que_zero(quantidade_acoes, "Quantidade de ações")
-    validar_maior_que_zero(preco_atual, "Preço atual da ação")
-
-    resultado = calcular_valuation(
-        fcf_inicial,
-        crescimento,
-        taxa_desconto,
-        anos_projecao,
-        crescimento_perpetuo,
-        divida,
-        caixa,
-        quantidade_acoes
-    )
-
-    cenarios = gerar_cenarios(crescimento)
-
-    cenario_pessimista = calcular_valuation(
-        fcf_inicial,
-        cenarios["pessimista"],
-        taxa_desconto,
-        anos_projecao,
-        crescimento_perpetuo,
-        divida,
-        caixa,
-        quantidade_acoes
-    )
-
-    cenario_base = calcular_valuation(
-        fcf_inicial,
-        cenarios["base"],
-        taxa_desconto,
-        anos_projecao,
-        crescimento_perpetuo,
-        divida,
-        caixa,
-        quantidade_acoes
-    )
-
-    cenario_otimista = calcular_valuation(
-        fcf_inicial,
-        cenarios["otimista"],
-        taxa_desconto,
-        anos_projecao,
-        crescimento_perpetuo,
-        divida,
-        caixa,
-        quantidade_acoes
-    )
-
-    margem_seguranca = calcular_margem_seguranca(
-        resultado["valor_justo_acao"],
-        preco_atual
-    )
-
-    potencial = calcular_potencial_valorizacao(
-        resultado["valor_justo_acao"],
-        preco_atual
-    )
-
-    diagnostico = gerar_diagnostico(margem_seguranca)
-
-    subtitulo("PROJEÇÃO DOS FLUXOS DE CAIXA")
-
-    for item in resultado["fluxos"]:
-        print(f"\nAno {item['ano']}")
-        print(f"Fluxo projetado: {formatar_moeda(item['fluxo'])}")
-        print(f"Valor presente: {formatar_moeda(item['valor_presente'])}")
-
-    subtitulo("RESULTADO DO VALUATION")
-
-    print(f"Empresa analisada: {nome_empresa}")
-    print(f"Taxa de desconto usada: {formatar_porcentagem(taxa_desconto)}")
-    print(f"Valor terminal: {formatar_moeda(resultado['valor_terminal'])}")
-    print(f"Valor terminal presente: {formatar_moeda(resultado['valor_terminal_presente'])}")
-    print(f"Valor estimado da empresa: {formatar_moeda(resultado['valor_empresa'])}")
-
-    subtitulo("PREÇO JUSTO DA AÇÃO")
-
-    print(f"Preço atual da ação: {formatar_moeda(preco_atual)}")
-    print(f"Preço justo calculado: {formatar_moeda(resultado['valor_justo_acao'])}")
-    print("Esse é o preço que a ação deveria custar com base nos dados informados.")
-    print(f"Potencial de valorização: {potencial:.2f}%")
-    print(f"Margem de segurança: {formatar_porcentagem(margem_seguranca)}")
-    print(f"Diagnóstico: {diagnostico}")
-
-    subtitulo("CENÁRIOS DE VALUATION")
-
-    print(f"Pessimista: {formatar_moeda(cenario_pessimista['valor_justo_acao'])}")
-    print(f"Base: {formatar_moeda(cenario_base['valor_justo_acao'])}")
-    print(f"Otimista: {formatar_moeda(cenario_otimista['valor_justo_acao'])}")
-
-    gerar_relatorio_txt(
-        nome_empresa,
-        taxa_desconto,
-        resultado,
-        preco_atual,
-        potencial,
-        margem_seguranca,
-        diagnostico,
-        cenario_pessimista,
-        cenario_base,
-        cenario_otimista
-    )
-
-    print("\nRelatório TXT gerado com sucesso.")
-
-except ValueError as erro:
-    print(f"\nErro: {erro}")
+if __name__ == "__main__":
+    main()

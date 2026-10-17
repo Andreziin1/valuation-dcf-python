@@ -1,10 +1,14 @@
 # Função para formatar valores em reais
 def formatar_moeda(valor):
+    if valor is None:
+        return "—"
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 # Função para formatar porcentagens
 def formatar_porcentagem(valor):
+    if valor is None:
+        return "—"
     return f"{valor * 100:.2f}%"
 
 
@@ -34,19 +38,20 @@ def validar_taxas(taxa_desconto, crescimento_perpetuo):
 
 # Função para calcular a margem de segurança
 def calcular_margem_seguranca(valor_justo_acao, preco_atual):
+    if valor_justo_acao <= 0 or preco_atual is None or preco_atual <= 0:
+        return None
     return (valor_justo_acao - preco_atual) / valor_justo_acao
 
 
 # Função para gerar um diagnóstico simples
 def gerar_diagnostico(margem_seguranca):
-    if margem_seguranca >= 0.20:
-        return "A ação aparenta estar descontada."
-
-    elif margem_seguranca > -0.10:
-        return "A ação aparenta estar próxima do valor justo."
-
-    else:
-        return "A ação aparenta estar cara."
+    if margem_seguranca is None:
+        return "Sem comparação válida para estas premissas."
+    if margem_seguranca > 0:
+        return "A estimativa está acima do preço de referência; não é retorno garantido."
+    if margem_seguranca < 0:
+        return "A estimativa está abaixo do preço de referência; depende das premissas."
+    return "Estimativa e preço de referência coincidem."
     
 def linha():
     print("=" * 50)
@@ -75,4 +80,6 @@ def gerar_cenarios(crescimento_base):
     }
 
 def calcular_potencial_valorizacao(valor_justo, preco_atual):
+    if valor_justo <= 0 or preco_atual is None or preco_atual <= 0:
+        return None
     return ((valor_justo - preco_atual) / preco_atual) * 100

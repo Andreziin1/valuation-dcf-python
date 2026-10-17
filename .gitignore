@@ -17,11 +17,18 @@ dist/
 build/
 
 # Logs
+*.tsbuildinfo
 *.log
 
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Artefatos locais de teste e implantação
+.pytest_cache/
+.vercel/
+coverage/
+relatorio_*.txt
 
 # VS Code
 .vscode/
