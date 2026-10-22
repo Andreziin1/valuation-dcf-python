@@ -71,7 +71,7 @@ def main():
         print("O FCF do fornecedor não é automaticamente FCFF. Confira a base do fluxo.")
         data["modelo_confirmado"] = input("Revisou fluxo FCFF e premissas? [s/N]: ").strip().lower() == "s"
         result = calcular(DadosValuation(**data))
-        value = formatar_moeda(result["valor_justo_acao"]) if result["estimativa_positiva"] else "Sem estimativa positiva"
+        value = formatar_moeda(result["valor_justo_acao"])
         print("\nValor estimado por ação/cota:", value)
         print("Preço de referência:", formatar_moeda(result["preco_atual"]))
         potential = result["potencial_valorizacao"]

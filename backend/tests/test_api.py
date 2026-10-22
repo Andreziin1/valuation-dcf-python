@@ -70,6 +70,7 @@ def test_nonpositive_equity_has_no_target_or_division_error(zero):
     assert response.status_code == 200
     r = response.json()
     assert not r["estimativa_positiva"]
+    assert (r["valor_justo_acao"] == pytest.approx(0) if zero else r["valor_justo_acao"] < 0)
     assert r["margem_seguranca"] is None and r["potencial_valorizacao"] is None
     assert r["avisos"]
 

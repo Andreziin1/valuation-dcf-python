@@ -24,7 +24,7 @@ export default function ResultPanel({ result: r, company, type, busy, adjusted }
         <div className="estimated">
           <span className="price-label">Valor estimado por {unit}</span>
           <strong className={!r ? 'empty-number' : !r.estimativa_positiva ? 'no-value' : ''}>
-            {r ? r.estimativa_positiva ? money(r.valor_justo_acao) : 'Sem valor positivo' : '—'}
+            {r ? money(r.valor_justo_acao) : '—'}
           </strong>
           <span className="price-caption">{r ? 'Estimativa pelo modelo DCF' : 'Preencha os dados para calcular'}</span>
         </div>
@@ -37,7 +37,7 @@ export default function ResultPanel({ result: r, company, type, busy, adjusted }
       <div className={'reading ' + (r && !r.estimativa_positiva ? 'warning' : '')} aria-live="polite">
         {busy ? <><strong>Calculando sua análise…</strong><p>Aguarde o resultado da API.</p></> :
         !r ? <><strong>Quanto a {unit} pode valer pelas suas premissas?</strong><p>O resultado compara o valor estimado pelo modelo com a cotação informada. Nenhum preço será calculado antes de você revisar os dados.</p></> :
-        !r.estimativa_positiva ? <><strong>Este cenário não gera uma estimativa positiva.</strong><p>Revise o fluxo, as taxas e o endividamento. Um valor negativo não significa que a ação será negociada a um preço negativo.</p></> :
+        !r.estimativa_positiva ? <><strong>O cálculo resultou em {money(r.valor_justo_acao)} por {unit}.</strong><p>Esse é o resultado matemático do modelo após descontar dívida e somar caixa. Um valor negativo não significa que a ação será negociada por um preço negativo; indica que, com estas premissas, o valor operacional não cobre as obrigações líquidas. Revise os dados financeiros e as premissas.</p></> :
         r.potencial_valorizacao === null ? <><strong>O modelo estima {money(r.valor_justo_acao)} por {unit}.</strong><p>Sem preço de referência, não é possível calcular a diferença para o mercado.</p></> :
         <><strong>{Math.abs(r.potencial_valorizacao) < 0.005 ? 'A estimativa é igual à cotação de referência.' :
           'A estimativa está ' + percent(Math.abs(r.potencial_valorizacao)) + (r.potencial_valorizacao >= 0 ? ' acima' : ' abaixo') + ' da cotação.'}</strong>
@@ -61,7 +61,7 @@ export default function ResultPanel({ result: r, company, type, busy, adjusted }
             {(['pessimista', 'base', 'otimista'] as const).map((key, i) => <tr key={key} className={key === 'base' ? 'base-row' : ''}>
               <th scope="row">{['Pessimista', 'Base', 'Otimista'][i]}</th>
               <td>{percent((r.premissas.crescimento + (i - 1) * 0.02) * 100)}</td>
-              <td>{r.cenarios[key] > 0 ? money(r.cenarios[key]) : 'Sem valor positivo'}</td></tr>)}
+              <td>{money(r.cenarios[key])}</td></tr>)}
           </tbody></table>
         </div>
       </details>

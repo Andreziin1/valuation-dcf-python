@@ -19,7 +19,8 @@ def gerar_relatorio_txt(nome_empresa, taxa_desconto, resultado, preco_atual,
     lines = [
         "NEXODCF — RELATÓRIO DE VALUATION", "Empresa: " + nome_empresa,
         "Calculado em: " + now.isoformat(), "Taxa de desconto: " + formatar_porcentagem(taxa_desconto),
-        "Estimativa por ação/cota: " + (formatar_moeda(value) if value > 0 else "Sem estimativa positiva"),
+        "Resultado matemático do modelo por ação/cota: " + formatar_moeda(value),
+        *(["O valor negativo é um resultado matemático das premissas, não um preço de negociação. Indica que o valor operacional calculado não cobre as obrigações líquidas."] if value <= 0 else []),
         "Preço de referência: " + formatar_moeda(preco_atual),
         "Diferença para o preço: " + (formatar_porcentagem(potencial / 100) if potencial is not None else "—"),
         "Margem de segurança: " + formatar_porcentagem(margem_seguranca),
@@ -28,7 +29,7 @@ def gerar_relatorio_txt(nome_empresa, taxa_desconto, resultado, preco_atual,
     ]
     for label, scenario in zip(("Pessimista", "Base", "Otimista"), (cenario_pessimista, cenario_base, cenario_otimista)):
         v = scenario["valor_justo_acao"]
-        lines.append(label + ": " + (formatar_moeda(v) if v > 0 else "Sem estimativa positiva"))
+        lines.append(label + ": " + formatar_moeda(v))
     lines += ["", "FLUXOS PROJETADOS"]
     lines += [f"Ano {f['ano']}: {formatar_moeda(f['fluxo'])} | Presente: {formatar_moeda(f['valor_presente'])}" for f in resultado.get("fluxos", [])]
     lines += ["", "Estimativa condicionada às premissas, não recomendação nem promessa de retorno.",

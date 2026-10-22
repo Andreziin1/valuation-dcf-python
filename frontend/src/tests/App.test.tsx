@@ -118,11 +118,18 @@ describe('resultado e relatório', () => {
     expect(reportText(result, 'listed', company, [])).toContain('Margem de segurança: 33,33%')
     expect(reportText(result, 'listed', company, [])).toContain('Diferença em relação ao preço de referência: 50,00%')
   })
-  it('não apresenta valor negativo como preço-alvo', () => {
+  it('exibe o resultado matemático negativo sem tratá-lo como preço negociado', () => {
     const negative = { ...result, valor_justo_acao: -1, estimativa_positiva: false, potencial_valorizacao: null, margem_seguranca: null }
     render(<ResultPanel result={negative} company={company} type="listed" busy={false} adjusted={[]} />)
-    expect(screen.getByText('Sem valor positivo')).toBeInTheDocument()
-    expect(screen.getByText(/não gera uma estimativa positiva/)).toBeInTheDocument()
-    expect(reportText(negative, 'listed', company, [])).toContain('Sem estimativa positiva')
+    expect(screen.getByText(/-1,00/)).toBeInTheDocument()
+    expect(screen.getByText(/não significa que a ação será negociada por um preço negativo/)).toBeInTheDocument()
+    expect(reportText(negative, 'listed', company, [])).toContain('Resultado matemático do modelo por ação/cota:')
+    expect(reportText(negative, 'listed', company, [])).toContain('-1,00')
+  })
+  it('compara uma estimativa positiva abaixo da cotação', () => {
+    const below = { ...result, valor_justo_acao: 50, potencial_valorizacao: -16.6666667, margem_seguranca: -0.2 }
+    render(<ResultPanel result={below} company={company} type="listed" busy={false} adjusted={[]} />)
+    expect(screen.getByText('A estimativa está 16,67% abaixo da cotação.')).toBeInTheDocument()
+    expect(screen.getByText('R$ 50,00')).toBeInTheDocument()
   })
 })

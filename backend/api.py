@@ -128,7 +128,7 @@ def calcular(dados: DadosValuation):
     margem = (valor - dados.preco_atual) / valor if comparavel else None
     avisos = []
     if not positivo:
-        avisos.append("As premissas não produziram valor positivo para os acionistas. Não há preço-alvo utilizável nesta análise.")
+        avisos.append("O cálculo resultou em valor negativo por ação/cota. Isso não significa preço de negociação negativo; com estas premissas, o valor operacional não cobre as obrigações líquidas. Revise o fluxo, a dívida, o caixa, a quantidade de ações e a compatibilidade entre FCFF e WACC.")
     ev = sum(f["valor_presente"] for f in resultado["fluxos"]) + resultado["valor_terminal_presente"]
     return {
         "empresa": dados.nome_empresa, "preco_atual": dados.preco_atual,
